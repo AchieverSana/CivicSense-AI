@@ -37,7 +37,7 @@ cp backend/.env.example backend/.env
 ```bash
 npm run dev
 # Frontend → http://localhost:3000
-# Backend  → http://localhost:5000
+# Backend  → http://localhost:5001
 ```
 
 ---
@@ -46,7 +46,7 @@ npm run dev
 
 ### Frontend (`frontend/.env.local`)
 ```
-NEXT_PUBLIC_API_URL=http://localhost:5000
+NEXT_PUBLIC_API_URL=http://localhost:5001
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
@@ -55,7 +55,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=        # or leave blank for OpenStreetMap
 
 ### Backend (`backend/.env`)
 ```
-PORT=5000
+PORT=5001
 MONGODB_URI=mongodb+srv://...
 GEMINI_API_KEY=
 CLOUDINARY_CLOUD_NAME=
@@ -145,6 +145,13 @@ GET    /api/issues/:id/report   # Generate PDF report
 | Community | Verification system, upvotes, gamification |
 | UX | Mobile-first Next.js, real-time updates via Socket.io |
 | Impact | Closes loop between citizen and authority |
+
+---
+
+## Deployment
+
+See [`DEPLOY.md`](./DEPLOY.md) — both frontend and backend ship as Docker
+containers on **Google Cloud Run** (required for Vibe2Ship submission).
 
 ---
 

@@ -1,0 +1,34 @@
+version: '3.9'
+
+# For LOCAL testing only — confirms both containers actually boot and talk
+# to each other before you push anything to Cloud Run. Both services still
+# use your real MongoDB Atlas / Gemini / Firebase / Cloudinary credentials
+# from the env files below; nothing here runs a local database.
+services:
+  backend:
+    build: ./backend
+    ports:
+      - '5001:8080' # container always listens on 8080 (Cloud Run convention)
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=8080
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Mirror whatever's in frontend/.env.local — Next.js bakes
+        # NEXT_PUBLIC_* vars in at build time, so they have to be passed
+        # as build args here too, not just runtime env vars.
+        NEXT_PUBLIC_API_URL: http://localhost:5001
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN}
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${NEXT_PUBLIC_FIREBASE_PROJECT_ID}
+        NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET}
+        NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}
+        NEXT_PUBLIC_FIREBASE_APP_ID: ${NEXT_PUBLIC_FIREBASE_APP_ID}
+    ports:
+      - '3000:8080'
+    depends_on:
+      - backend

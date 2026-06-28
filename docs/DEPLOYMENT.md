@@ -1,5 +1,16 @@
 # Deployment Guide — CivicSense AI
 
+⚠️ **Superseded.** Vibe2Ship requires the final link to be on Google Cloud,
+which Vercel + Railway (below) doesn't satisfy. Use **[`/DEPLOY.md`](../DEPLOY.md)**
+at the repo root instead — it deploys both services to Cloud Run using the
+`Dockerfile`s in `frontend/` and `backend/`.
+
+The MongoDB Atlas / Cloudinary / Firebase setup steps below are still
+accurate and are referenced from `DEPLOY.md` — only the *hosting* targets
+for the frontend/backend changed.
+
+---
+
 ## Frontend → Vercel (free)
 
 ```bash

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, ThumbsUp, ShieldCheck, MapPin, Clock, FileText, Sparkles, ImageOff } from 'lucide-react';
 import { issueApi } from '@/lib/api';
+import { useAuth } from '@/lib/AuthContext';
 
 type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
 
@@ -34,6 +35,7 @@ function isRemoteUrl(url?: string): boolean {
 export default function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { firebaseUser, signIn } = useAuth();
 
   const [issue, setIssue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,7 @@ export default function IssueDetailPage() {
   }, [id]);
 
   const handleVote = async () => {
+    if (!firebaseUser) return signIn();
     try {
       const { data } = await issueApi.vote(id);
       setVotes(data.votes);
@@ -68,6 +71,7 @@ export default function IssueDetailPage() {
   };
 
   const handleVerify = async () => {
+    if (!firebaseUser) return signIn();
     if (verifiedSelf) return;
     try {
       const { data } = await issueApi.verify(id);
@@ -193,6 +197,7 @@ export default function IssueDetailPage() {
         <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
           <button
             onClick={handleVote}
+            title={firebaseUser ? undefined : 'Sign in to vote'}
             className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
               voted
                 ? 'bg-civic-teal-light border-civic-teal text-civic-teal'
@@ -204,6 +209,7 @@ export default function IssueDetailPage() {
 
           <button
             onClick={handleVerify}
+            title={firebaseUser ? undefined : 'Sign in to verify'}
             className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
               verifiedSelf
                 ? 'bg-green-50 border-green-300 text-green-700'

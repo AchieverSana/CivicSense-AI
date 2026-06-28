@@ -1,8 +1,13 @@
 'use client';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, MapPin, Sparkles, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Camera, MapPin, Sparkles, CheckCircle, AlertTriangle, LocateFixed } from 'lucide-react';
 import { issueApi } from '@/lib/api';
+
+// Jaipur city center — used only if the browser can't provide a real location
+// (denied permission, unsupported browser, etc.), so we always have *some*
+// coordinates to submit rather than crashing the form.
+const FALLBACK_COORDS = { lat: 26.9124, lng: 75.7873 };
 
 type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
 
@@ -38,6 +43,27 @@ export default function ReportPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Real device location — replaces the old hardcoded Jaipur-center constant.
+  // Without this every single report landed on the exact same point, which
+  // silently broke the map, the heatmap, and the 100m duplicate-detection check.
+  const [coords, setCoords] = useState(FALLBACK_COORDS);
+  const [locStatus, setLocStatus] = useState<'locating' | 'found' | 'denied' | 'unsupported'>('locating');
+
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setLocStatus('unsupported');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocStatus('found');
+      },
+      () => setLocStatus('denied'),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, []);
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
@@ -68,8 +94,8 @@ export default function ReportPage() {
       if (desc) form.append('description', desc);
       form.append('city', 'Jaipur');
       form.append('address', location);
-      form.append('lat', '26.9124');
-      form.append('lng', '75.7873');
+      form.append('lat', String(coords.lat));
+      form.append('lng', String(coords.lng));
 
       const { data } = await issueApi.create(form);
       if (data.duplicate) {
@@ -231,6 +257,23 @@ export default function ReportPage() {
               className="w-full border border-gray-200 rounded-civic pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-civic-teal focus:border-transparent"
             />
           </div>
+          <p className="text-xs mt-1.5 flex items-center gap-1">
+            {locStatus === 'locating' && (
+              <span className="text-gray-400 flex items-center gap-1">
+                <LocateFixed size={11} className="animate-pulse" /> Getting your location…
+              </span>
+            )}
+            {locStatus === 'found' && (
+              <span className="text-civic-teal flex items-center gap-1">
+                <LocateFixed size={11} /> Location captured ({coords.lat.toFixed(4)}, {coords.lng.toFixed(4)})
+              </span>
+            )}
+            {(locStatus === 'denied' || locStatus === 'unsupported') && (
+              <span className="text-amber-600 flex items-center gap-1">
+                <AlertTriangle size={11} /> Couldn't get your exact location — using approximate Jaipur center. Edit the address above if needed.
+              </span>
+            )}
+          </p>
         </div>
 
         {/* AI Result */}

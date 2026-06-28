@@ -39,7 +39,7 @@ export default function DashboardPage() {
           { label: 'Open issues', value: stats?.open ?? 247, icon: AlertCircle, color: 'text-amber-600 bg-amber-50' },
           { label: 'Resolved (30d)', value: stats?.resolved ?? 83, icon: CheckCircle, color: 'text-civic-teal bg-civic-teal-light' },
           { label: 'Total reports', value: stats?.total ?? 1420, icon: TrendingUp, color: 'text-blue-600 bg-blue-50' },
-          { label: 'Community heroes', value: 1420, icon: Users, color: 'text-purple-600 bg-purple-50' },
+          { label: 'Community heroes', value: stats?.communityHeroes ?? 1420, icon: Users, color: 'text-purple-600 bg-purple-50' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="card p-4">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${color}`}>

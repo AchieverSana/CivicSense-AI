@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import { IssueCard } from '@/components/issues/IssueCard';
 import { issueApi } from '@/lib/api';
-import { Filter } from 'lucide-react';
+import { getSocket } from '@/lib/socket';
+import { Filter, Radio } from 'lucide-react';
 
 const CATEGORIES = ['All', 'Pothole', 'Garbage', 'Water leakage', 'Broken streetlight', 'Road damage', 'Sewage'];
 const SEVERITIES = ['All', 'Critical', 'High', 'Medium', 'Low'];
@@ -15,19 +16,46 @@ export default function FeedPage() {
   const [sev, setSev] = useState('All');
   const [status, setStatus] = useState('All');
   const [sort, setSort] = useState('-createdAt');
+  const [liveUpdate, setLiveUpdate] = useState(false);
 
-  useEffect(() => {
+  const fetchIssues = () => {
     const params: Record<string, string> = { city: 'Jaipur', sort };
     if (cat !== 'All') params.category = cat;
     if (sev !== 'All') params.severity = sev;
     if (status !== 'All') params.status = status;
 
     setLoading(true);
-    issueApi.list(params)
+    return issueApi.list(params)
       .then(({ data }) => setIssues(data.issues))
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchIssues();
   }, [cat, sev, status, sort]);
+
+  // Live updates: the backend broadcasts 'new-issue' / 'issue-updated' over
+  // Socket.io to the city room (see backend/src/index.ts +
+  // issues.controller.ts) whenever someone reports, votes, or verifies.
+  // We surface that as a "new activity" banner rather than silently
+  // re-fetching mid-scroll, which would be jarring during a live demo.
+  useEffect(() => {
+    const socket = getSocket();
+    socket.emit('join-city', 'Jaipur');
+    const onActivity = () => setLiveUpdate(true);
+    socket.on('new-issue', onActivity);
+    socket.on('issue-updated', onActivity);
+    return () => {
+      socket.off('new-issue', onActivity);
+      socket.off('issue-updated', onActivity);
+    };
+  }, []);
+
+  const refreshNow = () => {
+    setLiveUpdate(false);
+    fetchIssues();
+  };
 
   return (
     <div>
@@ -35,6 +63,15 @@ export default function FeedPage() {
         <h1 className="text-lg font-semibold">Community Feed</h1>
         <span className="text-sm text-gray-400">{issues.length} issues</span>
       </div>
+
+      {liveUpdate && (
+        <button
+          onClick={refreshNow}
+          className="w-full mb-4 flex items-center justify-center gap-2 text-sm bg-civic-teal-light text-civic-teal border border-civic-teal rounded-lg py-2 hover:opacity-90 transition-opacity"
+        >
+          <Radio size={13} className="animate-pulse" /> New activity in Jaipur — tap to refresh
+        </button>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-5">
@@ -51,7 +88,7 @@ export default function FeedPage() {
           className="ml-auto text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-500 bg-white">
           <option value="-createdAt">Newest</option>
           <option value="-priorityScore">Priority</option>
-          <option value="-votes">Most votes</option>
+          <option value="-voteCount">Most votes</option>
         </select>
       </div>
 

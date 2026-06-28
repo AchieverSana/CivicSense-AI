@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ThumbsUp, ShieldCheck, MapPin, Clock, FileText, ImageOff } from 'lucide-react';
 import { issueApi } from '@/lib/api';
+import { useAuth } from '@/lib/AuthContext';
 
 type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
 
@@ -52,6 +53,7 @@ function isRemoteUrl(url?: string): boolean {
 
 export function IssueCard({ issue }: IssueCardProps) {
   const router = useRouter();
+  const { firebaseUser, signIn } = useAuth();
   const [votes, setVotes] = useState(issue.votes.length);
   const [verified, setVerified] = useState(issue.verifiedBy.length);
   const [voted, setVoted] = useState(false);
@@ -60,6 +62,7 @@ export function IssueCard({ issue }: IssueCardProps) {
 
   const handleVote = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!firebaseUser) return signIn();
     try {
       const { data } = await issueApi.vote(issue._id);
       setVotes(data.votes);
@@ -69,6 +72,7 @@ export function IssueCard({ issue }: IssueCardProps) {
 
   const handleVerify = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!firebaseUser) return signIn();
     if (verifiedSelf) return;
     try {
       const { data } = await issueApi.verify(issue._id);
@@ -149,6 +153,7 @@ export function IssueCard({ issue }: IssueCardProps) {
       <div className="flex items-center gap-2">
         <button
           onClick={handleVote}
+          title={firebaseUser ? undefined : 'Sign in to vote'}
           className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
             voted
               ? 'bg-civic-teal-light border-civic-teal text-civic-teal'
@@ -160,6 +165,7 @@ export function IssueCard({ issue }: IssueCardProps) {
 
         <button
           onClick={handleVerify}
+          title={firebaseUser ? undefined : 'Sign in to verify'}
           className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
             verifiedSelf
               ? 'bg-green-50 border-green-300 text-green-700'

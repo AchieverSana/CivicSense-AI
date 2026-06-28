@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireAuth } from '../middleware/auth';
 import {
   createIssue,
   getIssues,
@@ -22,8 +22,12 @@ router.get('/', getIssues);
 router.get('/heatmap', getHeatmapData);
 router.get('/:id', getIssueById);
 router.post('/', authenticate, upload.single('media'), createIssue);
-router.post('/:id/vote', authenticate, voteIssue);
-router.post('/:id/verify', authenticate, verifyIssue);
+// vote/verify need a real account (not the 'guest' placeholder) — both write
+// the current user's id into an ObjectId array, which crashes for guests.
+// Voting/verification integrity also matters more than reporting, so
+// requiring sign-in here is the right tradeoff, not just a bug workaround.
+router.post('/:id/vote', authenticate, requireAuth, voteIssue);
+router.post('/:id/verify', authenticate, requireAuth, verifyIssue);
 router.get('/:id/report', authenticate, generateIssueReport);
 
 export default router;

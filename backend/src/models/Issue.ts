@@ -38,6 +38,7 @@ export interface IIssue extends Document {
     rawResponse?: string;
   };
   votes: mongoose.Types.ObjectId[];
+  voteCount: number;
   verifiedBy: mongoose.Types.ObjectId[];
   duplicateOf?: mongoose.Types.ObjectId;
   resolvedAt?: Date;
@@ -78,6 +79,10 @@ const IssueSchema = new Schema<IIssue>(
       rawResponse: String,
     },
     votes: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    // Mongo sorts array fields by comparing their contents, not their
+    // length — `.sort('-votes')` does NOT sort by vote count. This mirrors
+    // votes.length and is what "Most votes" actually sorts by.
+    voteCount: { type: Number, default: 0 },
     verifiedBy: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     duplicateOf: { type: Schema.Types.ObjectId, ref: 'Issue' },
     resolvedAt: Date,
@@ -92,5 +97,6 @@ IssueSchema.index({ location: '2dsphere' });
 IssueSchema.index({ status: 1, createdAt: -1 });
 IssueSchema.index({ 'location.city': 1, category: 1 });
 IssueSchema.index({ priorityScore: -1 });
+IssueSchema.index({ voteCount: -1 });
 
 export default mongoose.model<IIssue>('Issue', IssueSchema);

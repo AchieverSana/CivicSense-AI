@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Model } from 'mongoose';
 
 export type BadgeTier = 'Bronze Hero' | 'Silver Hero' | 'Gold Hero' | 'Platinum Hero';
 
@@ -17,7 +17,19 @@ export interface IUser extends Document {
   createdAt: Date;
 }
 
-const UserSchema = new Schema<IUser>(
+interface IUserModel extends Model<IUser> {
+  /**
+   * Increments points/issuesReported/issuesVerified/etc and persists via
+   * .save() so the pre('save') badge hook actually runs.
+   * findByIdAndUpdate({ $inc }) bypasses that hook entirely, which is why
+   * badges used to get stuck on "Bronze Hero" forever — use this instead
+   * of `User.findByIdAndUpdate(id, { $inc: ... })` anywhere points change.
+   * Points never go below 0 (e.g. when a vote is retracted).
+   */
+  awardPoints(userId: string | mongoose.Types.ObjectId, deltas: Partial<Record<'points' | 'issuesReported' | 'issuesVerified' | 'issuesResolved', number>>): Promise<IUser | null>;
+}
+
+const UserSchema = new Schema<IUser, IUserModel>(
   {
     uid: { type: String, required: true, unique: true },
     name: { type: String, required: true, trim: true },
@@ -43,4 +55,18 @@ UserSchema.pre('save', function (next) {
   next();
 });
 
-export default mongoose.model<IUser>('User', UserSchema);
+UserSchema.statics.awardPoints = async function (
+  userId: string | mongoose.Types.ObjectId,
+  deltas: Partial<Record<'points' | 'issuesReported' | 'issuesVerified' | 'issuesResolved', number>>
+) {
+  const user = await this.findById(userId);
+  if (!user) return null;
+  for (const [field, delta] of Object.entries(deltas)) {
+    const next = (user as any)[field] + (delta || 0);
+    (user as any)[field] = Math.max(0, next);
+  }
+  await user.save();
+  return user;
+};
+
+export default mongoose.model<IUser, IUserModel>('User', UserSchema);

@@ -9,7 +9,7 @@ router.get('/stats', async (req: Request, res: Response) => {
     const { city = 'Jaipur' } = req.query as { city: string };
     const monthStart = new Date(Date.now() - 30 * 86400000);
 
-    const [open, resolved, total, byCategory, bySeverity, recentTrend] = await Promise.all([
+    const [open, resolved, total, byCategory, bySeverity, recentTrend, communityHeroes] = await Promise.all([
       Issue.countDocuments({ 'location.city': city, status: 'open' }),
       Issue.countDocuments({ 'location.city': city, status: 'resolved', resolvedAt: { $gte: monthStart } }),
       Issue.countDocuments({ 'location.city': city }),
@@ -32,9 +32,11 @@ router.get('/stats', async (req: Request, res: Response) => {
         },
         { $sort: { _id: 1 } },
       ]),
+      // Was hardcoded to 1420 in the frontend regardless of real data.
+      User.countDocuments({ city }),
     ]);
 
-    res.json({ open, resolved, total, byCategory, bySeverity, recentTrend });
+    res.json({ open, resolved, total, byCategory, bySeverity, recentTrend, communityHeroes });
   } catch (err) {
     res.status(500).json({ error: 'Stats failed' });
   }

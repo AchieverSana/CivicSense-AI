@@ -89,10 +89,33 @@ function parseAnalysis(text: string): IssueAnalysis {
   return parsed;
 }
 
+// Used when Gemini's response isn't valid JSON (rare, but happens) and we'd
+// otherwise 500 the whole report submission. The image path already had an
+// equivalent fallback (re-runs as text-only); the text path didn't have any
+// fallback at all, so a single bad model response could kill a report.
+function fallbackAnalysis(description: string): IssueAnalysis {
+  return {
+    category: 'Other',
+    severity: 'Medium',
+    title: description.slice(0, 60) || 'Civic issue reported',
+    description: description || 'No description provided.',
+    department: 'General Administration',
+    priorityScore: 50,
+    estimatedFixDays: 7,
+    confidence: 0.3,
+    actionRecommendation: 'Routed for manual review — AI classification was inconclusive.',
+  };
+}
+
 export async function analyzeIssueText(description: string, location: string): Promise<IssueAnalysis> {
   const prompt = buildAnalysisPrompt(description, location);
-  const text = await callGemini(buildTextBody(prompt));
-  return parseAnalysis(text);
+  try {
+    const text = await callGemini(buildTextBody(prompt));
+    return parseAnalysis(text);
+  } catch (err) {
+    console.warn('Text analysis failed, using fallback classification:', err);
+    return fallbackAnalysis(description);
+  }
 }
 
 export async function analyzeIssueImage(
@@ -153,9 +176,13 @@ Respond ONLY with valid JSON, no markdown:
   try {
     const text = await callGemini(buildTextBody(prompt));
     const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+    // Gemini can hallucinate an ID that wasn't actually in the candidate
+    // list we gave it — only trust duplicateId if it's one we sent.
+    const validIds = new Set(nearbyIssues.map((i) => i.id));
+    const duplicateId = result.duplicateId && validIds.has(result.duplicateId) ? result.duplicateId : undefined;
     return {
-      isDuplicate: result.isDuplicate === true && result.confidence > 0.7,
-      duplicateId: result.duplicateId || undefined,
+      isDuplicate: result.isDuplicate === true && result.confidence > 0.7 && !!duplicateId,
+      duplicateId,
       confidence: result.confidence || 0,
     };
   } catch {

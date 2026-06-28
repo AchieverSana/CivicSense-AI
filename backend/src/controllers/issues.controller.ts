@@ -125,10 +125,9 @@ const userId = rawUserId === 'guest' ? await getOrCreateGuestUser() : rawUserId;
       },
     });
 
-    // Award points (+50 for reporting)
-    await User.findByIdAndUpdate(userId, {
-      $inc: { points: 50, issuesReported: 1 },
-    });
+    // Award points (+50 for reporting) — goes through .save() so badge tier
+    // actually recalculates (see User.awardPoints / models/User.ts)
+    await User.awardPoints(userId, { points: 50, issuesReported: 1 });
 
     // Broadcast to city room in real-time
     io.to(city || 'Jaipur').emit('new-issue', {
@@ -180,6 +179,16 @@ export async function getIssues(req: Request, res: Response) {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const [issues, total] = await Promise.all([
       query.skip(skip).limit(parseInt(limit)).populate('reportedBy', 'name avatar badge'),
+      // NOTE: when lat/lng are passed, `total`/`pages` are computed against
+      // `filter` only (no $near), so they reflect the city-wide count, not
+      // the in-radius count — that's intentionally the safer option. $near
+      // is a find()-only operator; countDocuments() runs through an
+      // aggregation $match stage that does NOT support it, so adding it
+      // here would throw rather than just be imprecise. Nothing in the
+      // frontend currently calls this with lat/lng, so it's not user-facing
+      // yet — if a "near me" view gets built, switch this whole branch to
+      // a $geoNear aggregation stage (which supports $facet for paginated
+      // results + count together) instead of patching countDocuments.
       Issue.countDocuments(filter),
     ]);
 
@@ -210,11 +219,16 @@ export async function voteIssue(req: Request, res: Response) {
     const hasVoted = issue.votes.includes(userId);
     if (hasVoted) {
       issue.votes = issue.votes.filter((v) => v.toString() !== userId.toString());
+      // Reverse the +10 given to the reporter when the vote is retracted —
+      // previously this never happened, so repeatedly toggling a vote
+      // on/off could inflate the reporter's points without limit.
+      await User.awardPoints(issue.reportedBy, { points: -10 });
     } else {
       issue.votes.push(userId);
       // Award +10 points to reporter
-      await User.findByIdAndUpdate(issue.reportedBy, { $inc: { points: 10 } });
+      await User.awardPoints(issue.reportedBy, { points: 10 });
     }
+    issue.voteCount = issue.votes.length;
 
     // Recalculate priority score
     const ageHours = (Date.now() - issue.createdAt.getTime()) / 3600000;
@@ -251,7 +265,7 @@ export async function verifyIssue(req: Request, res: Response) {
       );
       await issue.save();
       // +15 points for verifying
-      await User.findByIdAndUpdate(userId, { $inc: { points: 15, issuesVerified: 1 } });
+      await User.awardPoints(userId, { points: 15, issuesVerified: 1 });
     }
 
     res.json({ verifiedBy: issue.verifiedBy.length, priorityScore: issue.priorityScore });

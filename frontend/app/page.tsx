@@ -57,6 +57,9 @@ export default function FeedPage() {
     fetchIssues();
   };
 
+  const resolvedIssues = issues.filter((issue) => issue.status === 'resolved');
+  const openIssues = issues.filter((issue) => issue.status !== 'resolved');
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -109,9 +112,31 @@ export default function FeedPage() {
           <p className="text-sm">Try changing the filters or be the first to report!</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {issues.map((issue) => <IssueCard key={issue._id} issue={issue} />)}
-        </div>
+        <>
+          {openIssues.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-sm font-semibold text-gray-700">Open</h2>
+                <span className="text-xs text-gray-400">{openIssues.length}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {openIssues.map((issue) => <IssueCard key={issue._id} issue={issue} />)}
+              </div>
+            </div>
+          )}
+
+          {resolvedIssues.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <h2 className="text-sm font-semibold text-gray-700">Resolved</h2>
+                <span className="text-xs text-gray-400">{resolvedIssues.length}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {resolvedIssues.map((issue) => <IssueCard key={issue._id} issue={issue} />)}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

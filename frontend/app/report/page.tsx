@@ -8,6 +8,16 @@ import { issueApi } from '@/lib/api';
 // (denied permission, unsupported browser, etc.), so we always have *some*
 // coordinates to submit rather than crashing the form.
 const FALLBACK_COORDS = { lat: 26.9124, lng: 75.7873 };
+async function geocodeAddress(address: string) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    if (data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch {
+    // fall through to default
+  }
+  return FALLBACK_COORDS;
+}
 
 type Severity = 'Critical' | 'High' | 'Medium' | 'Low';
 
@@ -89,13 +99,18 @@ export default function ReportPage() {
     setLoading(true);
     setError(null);
     try {
-      const form = new FormData();
-      if (file) form.append('media', file);
-      if (desc) form.append('description', desc);
-      form.append('city', 'Jaipur');
-      form.append('address', location);
-      form.append('lat', String(coords.lat));
-      form.append('lng', String(coords.lng));
+      let finalCoords = coords;
+if (locStatus !== 'found' && location.trim()) {
+  finalCoords = await geocodeAddress(location);
+}
+
+const form = new FormData();
+if (file) form.append('media', file);
+if (desc) form.append('description', desc);
+form.append('city', 'Jaipur');
+form.append('address', location);
+form.append('lat', String(finalCoords.lat));
+form.append('lng', String(finalCoords.lng));
 
       const { data } = await issueApi.create(form);
       if (data.duplicate) {

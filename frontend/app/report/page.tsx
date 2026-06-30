@@ -4,16 +4,9 @@ import { useRouter } from 'next/navigation';
 import { Camera, MapPin, Sparkles, CheckCircle, AlertTriangle, LocateFixed } from 'lucide-react';
 import { issueApi } from '@/lib/api';
 
-// Jaipur city center — used only if the browser can't provide a real location
-// (denied permission, unsupported browser, etc.) AND the address can't be
-// geocoded either, so we always have *some* coordinates to submit rather
-// than crashing the form.
+// Jaipur city center — only used as a last-resort fallback if geocoding the
+// typed address itself fails (e.g. nonsense text, network error).
 const FALLBACK_COORDS = { lat: 26.9124, lng: 75.7873 };
-
-// Default placeholder text in the address field — if GPS is unavailable and
-// the user never edits this, geocoding it would just resolve to the same
-// generic Jaipur-center point for everyone, recreating the original bug.
-const PLACEHOLDER_LOCATION = 'Jaipur, Rajasthan';
 
 async function geocodeAddress(address: string) {
   try {
@@ -51,7 +44,7 @@ export default function ReportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [desc, setDesc] = useState('');
-  const [location, setLocation] = useState(PLACEHOLDER_LOCATION);
+  const [location, setLocation] = useState('Jaipur, Rajasthan');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AIResult | null>(null);
@@ -60,10 +53,12 @@ export default function ReportPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Real device location — replaces the old hardcoded Jaipur-center constant.
-  // Without this every single report landed on the exact same point, which
-  // silently broke the map, the heatmap, and the 100m duplicate-detection check.
-  const [coords, setCoords] = useState(FALLBACK_COORDS);
+  // We still try to grab device GPS — but only for an unused status
+  // indicator. It is NEVER used as the coordinates we submit — every
+  // report's pin on the map is determined solely by geocoding the address
+  // text the user typed, so multiple reports correctly land on different
+  // points if the user describes different locations (important for a
+  // hackathon demo where one device is used to submit many issues).
   const [locStatus, setLocStatus] = useState<'locating' | 'found' | 'denied' | 'unsupported'>('locating');
 
   useEffect(() => {
@@ -72,21 +67,11 @@ export default function ReportPage() {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocStatus('found');
-      },
+      () => setLocStatus('found'),
       () => setLocStatus('denied'),
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }, []);
-
-  // True when GPS isn't available AND the user hasn't given a real address —
-  // submitting in this state would silently fall back to the generic
-  // Jaipur-center point again, so we block it and ask for a real address.
-  const needsRealAddress =
-    (locStatus === 'denied' || locStatus === 'unsupported') &&
-    location.trim().toLowerCase() === PLACEHOLDER_LOCATION.toLowerCase();
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -110,19 +95,17 @@ export default function ReportPage() {
 
   const handleSubmitForAnalysis = async () => {
     if (!file && !desc.trim()) return;
-
-    if (needsRealAddress) {
-      setError('We couldn\'t get your exact location. Please type the specific address above before submitting.');
+    if (!location.trim()) {
+      setError('Please enter a location.');
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      let finalCoords = coords;
-      if (locStatus !== 'found' && location.trim()) {
-        finalCoords = await geocodeAddress(location);
-      }
+      // Always geocode the typed address — this is the single source of
+      // truth for where the pin lands on the map, regardless of GPS.
+      const finalCoords = await geocodeAddress(location);
 
       const form = new FormData();
       if (file) form.append('media', file);
@@ -289,30 +272,13 @@ export default function ReportPage() {
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className={`w-full border rounded-civic pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-civic-teal focus:border-transparent ${
-                needsRealAddress ? 'border-amber-300' : 'border-gray-200'
-              }`}
+              placeholder="e.g. Station Road, Near Jaipur Junction, Gopalbari, Jaipur"
+              className="w-full border border-gray-200 rounded-civic pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-civic-teal focus:border-transparent"
             />
           </div>
-          <p className="text-xs mt-1.5 flex items-center gap-1">
-            {locStatus === 'locating' && (
-              <span className="text-gray-400 flex items-center gap-1">
-                <LocateFixed size={11} className="animate-pulse" /> Getting your location…
-              </span>
-            )}
-            {locStatus === 'found' && (
-              <span className="text-civic-teal flex items-center gap-1">
-                <LocateFixed size={11} /> Location captured ({coords.lat.toFixed(4)}, {coords.lng.toFixed(4)})
-              </span>
-            )}
-            {(locStatus === 'denied' || locStatus === 'unsupported') && (
-              <span className="text-amber-600 flex items-center gap-1">
-                <AlertTriangle size={11} />
-                {needsRealAddress
-                  ? "Couldn't get your exact location — please type the specific address above."
-                  : "Couldn't get your exact location — using the address you typed above."}
-              </span>
-            )}
+          <p className="text-xs mt-1.5 text-gray-400 flex items-center gap-1">
+            <LocateFixed size={11} /> The pin on the map is placed based on this address — type the
+            specific street/area where the issue actually is.
           </p>
         </div>
 
@@ -367,7 +333,7 @@ export default function ReportPage() {
         {!result && (
           <button
             onClick={handleSubmitForAnalysis}
-            disabled={loading || (!file && !desc.trim()) || needsRealAddress}
+            disabled={loading || (!file && !desc.trim())}
             className="btn-primary w-full justify-center py-3"
           >
             {loading ? (

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate, requireAuth } from '../middleware/auth';
 import User from '../models/User';
 import Issue from '../models/Issue';
 
@@ -26,6 +26,29 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
     return res.json({ uid: 'guest-user', name: 'Guest', isGuest: true });
   }
   res.json((req as any).user);
+});
+
+// POST /api/users/promote-admin — self-promotion via a secret invite code,
+// instead of editing roles manually in MongoDB Atlas. Must be signed in
+// first (not guest). The code lives in process.env.ADMIN_INVITE_CODE so it
+// can be rotated/removed without a code change — just update the Render
+// env var and redeploy.
+router.post('/promote-admin', authenticate, requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+    const userId = (req as any).userId;
+
+    if (!code || code !== process.env.ADMIN_INVITE_CODE) {
+      return res.status(403).json({ error: 'Invalid invite code' });
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { role: 'admin' }, { new: true }).select(
+      'name email role'
+    );
+    res.json({ message: 'You are now an admin', role: user?.role });
+  } catch (err) {
+    res.status(500).json({ error: 'Promotion failed' });
+  }
 });
 
 // GET /api/users/:id/profile

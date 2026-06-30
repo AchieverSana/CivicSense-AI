@@ -11,6 +11,7 @@ interface Profile {
   badge: string;
   points: number;
   isGuest?: boolean;
+  role?: 'citizen' | 'admin' | 'authority';
 }
 
 interface AuthContextType {

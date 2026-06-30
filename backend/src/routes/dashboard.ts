@@ -10,7 +10,7 @@ router.get('/stats', async (req: Request, res: Response) => {
     const monthStart = new Date(Date.now() - 30 * 86400000);
 
     const [open, resolved, total, byCategory, bySeverity, recentTrend, communityHeroes] = await Promise.all([
-      Issue.countDocuments({ 'location.city': city, status: 'open' }),
+      Issue.countDocuments({ 'location.city': city, status: { $in: ['open', 'in-progress'] } }),
       Issue.countDocuments({ 'location.city': city, status: 'resolved', resolvedAt: { $gte: monthStart } }),
       Issue.countDocuments({ 'location.city': city }),
       Issue.aggregate([

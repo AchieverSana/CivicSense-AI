@@ -2,38 +2,91 @@
 ### Community Hero — Hyperlocal Problem Solver
 > Vibe2Ship Hackathon | Coding Ninjas × Google for Developers
 
-AI-powered civic engagement platform that turns citizen photos into verified, prioritized infrastructure complaints — resolved faster through community power.
+CivicSense AI turns a citizen's photo of a civic problem (pothole, garbage pile, water leak, broken streetlight...) into a verified, prioritized complaint — automatically classified by AI, pinned on a live map, and pushed toward resolution through community upvotes and verification.
 
 ---
 
-## Quick Start (7 minutes to running)
+## 1. What it does (Demo Flow)
+
+1. **Snap & Report** — A user uploads a photo and types a location. Google Gemini Vision looks at the image and instantly returns: category, severity (Critical/High/Medium/Low), a generated title + description, the responsible department, a priority score, and an estimated fix time.
+2. **Duplicate Check** — Before creating a new issue, the backend checks nearby reports (distance + AI similarity) so the same pothole doesn't get reported 50 times — it nudges the user to upvote the existing one instead.
+3. **Community Feed** — Everyone sees open and resolved issues in a live, filterable feed (category, severity, status, sort by newest/priority/votes), updated in real time over Socket.io whenever someone reports, votes, or verifies.
+4. **Map View** — All issues plotted on a Leaflet/OpenStreetMap map, so patterns (e.g. an entire street with no streetlights) become visible at a glance.
+5. **Verify & Vote** — Other citizens upvote and "verify" an issue, which raises its priority score — crowd-sourced confirmation that the problem is real and urgent.
+6. **Gamification** — Reporting and verifying earns points; users climb from Bronze → Silver → Gold Hero badges and appear on the public leaderboard.
+7. **Ask AI** — A chatbot answers natural-language questions about the city's issues (e.g. "what are the worst potholes near MI Road?").
+8. **Authority Report** — One click generates a shareable PDF-style report of an issue, ready to send to the relevant civic department.
+9. **Admin Tools** — Verified admins (see below) can mark issues as resolved and view aggregate stats/heatmaps on the dashboard.
+
+---
+
+## 2. Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
+| Backend | Node.js, Express, TypeScript |
+| Database | MongoDB Atlas + Mongoose |
+| AI | Google Gemini 2.5 Flash (Vision + Text) |
+| Auth | Firebase Authentication (Google Sign-In) |
+| Storage | Cloudinary (image hosting) |
+| Maps | Leaflet.js + OpenStreetMap (no paid Mapbox key required) |
+| Realtime | Socket.io |
+
+---
+
+## 3. Project Structure
+
+```
+civicsense/
+├── frontend/                # Next.js 14 app
+│   ├── app/                 # Pages (App Router)
+│   │   ├── page.tsx              → Community feed (home)
+│   │   ├── report/page.tsx       → Report a new issue (AI classification)
+│   │   ├── map/page.tsx          → Map view of all issues
+│   │   ├── dashboard/page.tsx    → Stats & heatmap (admin-friendly)
+│   │   ├── leaderboard/page.tsx  → Civic Hero leaderboard
+│   │   ├── chat/page.tsx         → AI chatbot
+│   │   ├── admin-invite/page.tsx → Become an admin (see Section 5)
+│   │   └── issues/[id]/page.tsx  → Single issue detail page
+│   ├── components/          # Navbar, IssueCard, MapView, etc.
+│   └── lib/                 # API client, Firebase, AuthContext, sockets
+├── backend/                  # Express API
+│   └── src/
+│       ├── controllers/      # Issue + report logic
+│       ├── models/           # Mongoose schemas (User, Issue)
+│       ├── routes/           # auth, issues, dashboard, users, ai
+│       ├── services/         # Gemini AI service, Cloudinary service
+│       └── middleware/       # Firebase auth, role checks
+└── docs/                      # Extra deployment docs
+```
+
+---
+
+## 4. Quick Start (Local Setup)
 
 ### Prerequisites
 - Node.js 18+
-- MongoDB Atlas account (free tier)
-- Google Gemini API key
-- Firebase project
-- Cloudinary account
+- A MongoDB Atlas cluster (free tier is fine)
+- A Google Gemini API key ([ai.google.dev](https://ai.google.dev))
+- A Firebase project with Google Sign-In enabled
+- A Cloudinary account (free tier is fine)
 
-### 1. Clone & install
+### Step 1 — Clone & install
 ```bash
 git clone https://github.com/yourteam/civicsense-ai
 cd civicsense-ai
-
-# Install both frontend and backend
-npm run setup
+npm run setup     # installs both frontend and backend dependencies
 ```
 
-### 2. Configure environment
+### Step 2 — Configure environment variables
 ```bash
-# Copy env templates
 cp frontend/.env.example frontend/.env.local
 cp backend/.env.example backend/.env
-
-# Fill in your keys (see Environment Variables below)
 ```
+Then fill in the values (see table below).
 
-### 3. Run
+### Step 3 — Run it
 ```bash
 npm run dev
 # Frontend → http://localhost:3000
@@ -42,118 +95,102 @@ npm run dev
 
 ---
 
-## Environment Variables
+## 5. Environment Variables
 
-### Frontend (`frontend/.env.local`)
-```
-NEXT_PUBLIC_API_URL=http://localhost:5001
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_MAPBOX_TOKEN=        # or leave blank for OpenStreetMap
-```
+### `frontend/.env.local`
+| Variable | What it's for |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | URL of the backend (`http://localhost:5001` locally) |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase web app key |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase auth domain |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase project ID |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase storage bucket |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase sender ID |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase app ID |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Optional — leave blank to use free OpenStreetMap tiles |
 
-### Backend (`backend/.env`)
-```
-PORT=5001
-MONGODB_URI=mongodb+srv://...
-GEMINI_API_KEY=
-CLOUDINARY_CLOUD_NAME=
-CLOUDINARY_API_KEY=
-CLOUDINARY_API_SECRET=
-FIREBASE_SERVICE_ACCOUNT=        # JSON string of Firebase service account
-JWT_SECRET=your-secret-here
-CLIENT_URL=http://localhost:3000
-```
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui |
-| Backend | Node.js, Express, TypeScript |
-| Database | MongoDB Atlas + Mongoose |
-| AI | Google Gemini 2.5 Flash (Vision + Text) |
-| Auth | Firebase Authentication |
-| Storage | Cloudinary |
-| Maps | Leaflet.js + OpenStreetMap |
-| Realtime | Socket.io |
+### `backend/.env`
+| Variable | What it's for |
+|---|---|
+| `PORT` | Backend port (default `5001`) |
+| `MONGODB_URI` | Your MongoDB Atlas connection string |
+| `GEMINI_API_KEY` | Google Gemini API key (powers image classification + chatbot) |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cloudinary credentials for storing uploaded photos |
+| `FIREBASE_SERVICE_ACCOUNT` | The full Firebase service-account JSON, as one string |
+| `JWT_SECRET` | Any random string — used to sign internal tokens |
+| `CLIENT_URL` | Frontend URL, for CORS (`http://localhost:3000` locally) |
+| `ADMIN_INVITE_CODE` | Secret password that unlocks admin access — see Section 6 |
 
 ---
 
-## Project Structure
+## 6. Becoming an Admin (Important for Judging Demo)
+
+Admins can resolve issues and see the full stats dashboard. Instead of manually editing roles in MongoDB Atlas, the app has a self-serve **Admin Invite** page that's perfect for a hackathon demo:
+
+1. Sign in normally with Google (top-right "Sign in" button).
+2. Go to **`/admin-invite`** in the browser.
+3. Enter the secret invite code and submit.
+4. Your account is instantly promoted to `admin`, and you're redirected to the home feed with admin powers unlocked.
+
+**How it works under the hood:** the `/admin-invite` page sends the code you type to `POST /api/users/promote-admin`. The backend compares it against the `ADMIN_INVITE_CODE` environment variable on the server — if it matches, your user document's `role` field is set to `admin`. This logic is correct and safe to use as-is: the code is never exposed in frontend code, only the backend env var, and the endpoint requires you to already be signed in (no anonymous/guest promotion).
+
+**The secret invite code** (set in `backend/.env`, value `ADMIN_INVITE_CODE`):
 
 ```
-civicsense/
-├── frontend/           # Next.js 14 app
-│   ├── app/            # App Router pages
-│   ├── components/     # Reusable components
-│   ├── hooks/          # Custom React hooks
-│   └── lib/            # Utilities & API client
-├── backend/            # Express API
-│   └── src/
-│       ├── controllers/  # Route handlers
-│       ├── models/       # Mongoose schemas
-│       ├── routes/       # API routes
-│       ├── services/     # Gemini AI, Cloudinary
-│       └── middleware/   # Auth, validation
-└── docs/               # API docs
+civic-admin-2026
 ```
+
+> ⚠️ This is a demo-friendly default checked into `backend/.env.example` so the feature works out of the box for judges/teammates. For anything beyond a hackathon demo, change this to a unique, private value in your real `backend/.env` (which is git-ignored and never committed) and don't share it publicly.
 
 ---
 
-## Key Features for Demo
-
-1. **Upload photo** → Gemini Vision classifies issue, assigns severity & department
-2. **View on map** → Leaflet map with clustered issue pins & heatmap overlay
-3. **Community verification** → Upvote + confirm to raise priority score
-4. **Duplicate detection** → Haversine distance + AI similarity check
-5. **AI Chatbot** → Natural language queries about your city's issues
-6. **Gamification** → Bronze / Silver / Gold Hero badges + leaderboard
-7. **PDF report** → One-click authority report generation
-
----
-
-## API Endpoints
+## 7. API Endpoints
 
 ```
 POST   /api/auth/register
 POST   /api/auth/login
-POST   /api/issues              # Create issue (multipart/form-data)
-GET    /api/issues              # List issues (filter, paginate, sort)
-GET    /api/issues/:id          # Issue detail
-POST   /api/issues/:id/vote     # Upvote / downvote
-POST   /api/issues/:id/verify   # Community verify
-POST   /api/issues/:id/comment  # Add comment
-GET    /api/dashboard/stats     # Admin stats
-GET    /api/dashboard/heatmap   # Heatmap data
-GET    /api/users/leaderboard   # Top contributors
-POST   /api/ai/chat             # AI chatbot
-GET    /api/issues/:id/report   # Generate PDF report
+GET    /api/auth/me                  Get currently signed-in user
+
+POST   /api/issues                   Create issue (multipart/form-data, photo + AI classification)
+GET    /api/issues                   List issues (filter, paginate, sort)
+GET    /api/issues/:id               Issue detail
+POST   /api/issues/:id/vote          Upvote / downvote        (sign-in required)
+POST   /api/issues/:id/verify        Community verify         (sign-in required)
+POST   /api/issues/:id/resolve       Mark resolved             (admin only)
+GET    /api/issues/:id/report        Generate authority report
+GET    /api/issues/heatmap           Heatmap data points
+
+GET    /api/dashboard/stats          Admin stats
+GET    /api/dashboard/heatmap        Heatmap aggregates
+
+GET    /api/users/leaderboard        Top contributors
+GET    /api/users/me                 Current user profile
+GET    /api/users/:id/profile        Public user profile
+POST   /api/users/promote-admin      Redeem admin invite code (see Section 6)
+
+POST   /api/ai/chat                  AI chatbot — ask questions about city issues
 ```
 
 ---
 
-## Scoring Rubric Coverage
+## 8. Scoring Rubric Coverage
 
-| Criterion | Implementation |
-|-----------|---------------|
-| AI Integration | Gemini Vision for classification, severity, department routing |
-| Data & Analytics | MongoDB aggregations, heatmaps, trend charts |
-| Community | Verification system, upvotes, gamification |
-| UX | Mobile-first Next.js, real-time updates via Socket.io |
-| Impact | Closes loop between citizen and authority |
-
----
-
-## Deployment
-
-See [`DEPLOY.md`](./DEPLOY.md) — both frontend and backend ship as Docker
-containers on **Google Cloud Run** (required for Vibe2Ship submission).
+| Criterion | How CivicSense AI covers it |
+|---|---|
+| **AI Integration** | Gemini Vision classifies every photo (category, severity, department), powers duplicate-similarity checks, and drives the natural-language chatbot |
+| **Data & Analytics** | MongoDB aggregations power the dashboard stats, heatmaps, and priority scoring |
+| **Community** | Upvotes, verification, comments, and a public leaderboard make resolution a crowd-sourced effort |
+| **UX** | Mobile-first Next.js UI, instant AI feedback on upload, real-time feed updates via Socket.io |
+| **Impact** | Closes the loop between a citizen noticing a problem and an authority acting on a verified, prioritized report |
 
 ---
 
-## Team
-Built at Vibe2Ship Hackathon 2026
+## 9. Deployment
+
+Both `frontend/` and `backend/` ship as Docker containers (see their respective `Dockerfile`s) and are designed to deploy on **Google Cloud Run**. Full step-by-step instructions are in [`DEPLOY.md`](./DEPLOY.md).
+
+---
+
+## 10. Team
+
+Built at Vibe2Ship Hackathon 2026.

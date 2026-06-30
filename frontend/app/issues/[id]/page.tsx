@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ThumbsUp, ShieldCheck, MapPin, Clock, FileText, Sparkles, ImageOff } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, ShieldCheck, MapPin, Clock, FileText, Sparkles, ImageOff, CheckCircle } from 'lucide-react';
 import { issueApi } from '@/lib/api';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -35,7 +35,7 @@ function isRemoteUrl(url?: string): boolean {
 export default function IssueDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { firebaseUser, signIn } = useAuth();
+  const { firebaseUser, signIn, profile } = useAuth();
 
   const [issue, setIssue] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +46,7 @@ export default function IssueDetailPage() {
   const [voted, setVoted] = useState(false);
   const [verified, setVerified] = useState(0);
   const [verifiedSelf, setVerifiedSelf] = useState(false);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -78,6 +79,18 @@ export default function IssueDetailPage() {
       setVerified(data.verifiedBy);
       setVerifiedSelf(true);
     } catch {}
+  };
+
+  const handleResolve = async () => {
+    if (resolving || issue.status === 'resolved') return;
+    setResolving(true);
+    try {
+      const { data } = await issueApi.resolve(id);
+      setIssue((prev: any) => ({ ...prev, status: data.status, resolvedAt: data.resolvedAt }));
+    } catch {
+    } finally {
+      setResolving(false);
+    }
   };
 
   const handleReport = async () => {
@@ -226,6 +239,16 @@ export default function IssueDetailPage() {
           >
             <FileText size={12} /> Download report
           </button>
+
+          {(profile?.role === 'admin' || profile?.role === 'authority') && issue.status !== 'resolved' && (
+            <button
+              onClick={handleResolve}
+              disabled={resolving}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-civic-teal bg-civic-teal text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+            >
+              <CheckCircle size={12} /> {resolving ? 'Resolving...' : 'Mark Resolved'}
+            </button>
+          )}
         </div>
       </div>
     </div>

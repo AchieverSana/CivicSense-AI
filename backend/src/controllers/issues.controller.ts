@@ -274,6 +274,34 @@ export async function verifyIssue(req: Request, res: Response) {
   }
 }
 
+// Marks an issue resolved. Restricted to admins via the `requireAdmin`
+// middleware on the route — see routes/issues.ts. Awards the original
+// reporter a completion bonus once it's actually fixed.
+export async function resolveIssue(req: Request, res: Response) {
+  try {
+    const adminUserId = (req as any).userId;
+    const issue = await Issue.findById(req.params.id);
+    if (!issue) return res.status(404).json({ error: 'Not found' });
+
+    if (issue.status === 'resolved') {
+      return res.json({ status: issue.status, resolvedAt: issue.resolvedAt });
+    }
+
+    issue.status = 'resolved';
+    issue.resolvedAt = new Date();
+    issue.resolvedBy = adminUserId;
+    await issue.save();
+
+    // +30 bonus points to the original reporter when their issue gets resolved
+    await User.awardPoints(issue.reportedBy, { points: 30, issuesResolved: 1 });
+
+    io.to(issue.location.city).emit('issue-updated', { _id: issue._id, status: 'resolved' });
+    res.json({ status: issue.status, resolvedAt: issue.resolvedAt });
+  } catch (err) {
+    res.status(500).json({ error: 'Resolve failed' });
+  }
+}
+
 export async function getHeatmapData(req: Request, res: Response) {
   try {
     const { city = 'Jaipur', days = '30' } = req.query as Record<string, string>;

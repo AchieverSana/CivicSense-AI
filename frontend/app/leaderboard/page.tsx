@@ -20,18 +20,9 @@ export default function LeaderboardPage() {
     userApi.leaderboard('Jaipur').then(({ data }) => setLeaders(data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const fallback = [
-    { name: 'Priya Sharma', badge: 'Gold Hero', points: 2340, issuesReported: 47, issuesVerified: 128 },
-    { name: 'Rahul Mehta', badge: 'Gold Hero', points: 1890, issuesReported: 38, issuesVerified: 94 },
-    { name: 'Anjali Singh', badge: 'Silver Hero', points: 1540, issuesReported: 31, issuesVerified: 72 },
-    { name: 'Dev Agarwal', badge: 'Silver Hero', points: 840, issuesReported: 17, issuesVerified: 41 },
-    { name: 'Neha Joshi', badge: 'Bronze Hero', points: 620, issuesReported: 12, issuesVerified: 28 },
-    { name: 'Arjun Kapoor', badge: 'Bronze Hero', points: 480, issuesReported: 9, issuesVerified: 20 },
-  ];
-
-  // Blend real signups in with the demo entries so the board never looks empty,
-  // and sort everyone together by points.
-  const data = [...leaders, ...fallback].sort((a, b) => b.points - a.points);
+  // Sort everyone by points (highest first). Only real users from the API —
+  // no demo/placeholder entries, so this always matches what's shown elsewhere.
+  const data = [...leaders].sort((a, b) => b.points - a.points);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -70,6 +61,16 @@ export default function LeaderboardPage() {
       </div>
 
       {/* Leaderboard */}
+      {loading ? (
+        <div className="card p-6 space-y-3 animate-pulse">
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded-lg" />)}
+        </div>
+      ) : data.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <p className="text-lg mb-1">No heroes yet</p>
+          <p className="text-sm">Report or verify an issue to be the first on the board!</p>
+        </div>
+      ) : (
       <div className="card overflow-hidden">
         {data.map((user, i) => {
           const initials = user.name.split(' ').map((n: string) => n[0]).join('');
@@ -93,6 +94,7 @@ export default function LeaderboardPage() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }

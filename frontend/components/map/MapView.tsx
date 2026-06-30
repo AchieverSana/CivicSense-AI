@@ -49,6 +49,10 @@ export default function MapView() {
       .catch(() => {});
   }, []);
 
+  // Only show issues that still need attention — resolved ones don't belong
+  // on a map meant to help people see live problems.
+  const openIssues = issues.filter((issue) => issue.status !== 'resolved');
+
   // Jaipur center
   const center: [number, number] = [26.9124, 75.7873];
 
@@ -59,7 +63,7 @@ export default function MapView() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {issues.map((issue) => {
+        {openIssues.map((issue) => {
           const [lng, lat] = issue.location?.coordinates || [75.7873, 26.9124];
           return (
             <Marker

@@ -5,9 +5,16 @@ import { Camera, MapPin, Sparkles, CheckCircle, AlertTriangle, LocateFixed } fro
 import { issueApi } from '@/lib/api';
 
 // Jaipur city center — used only if the browser can't provide a real location
-// (denied permission, unsupported browser, etc.), so we always have *some*
-// coordinates to submit rather than crashing the form.
+// (denied permission, unsupported browser, etc.) AND the address can't be
+// geocoded either, so we always have *some* coordinates to submit rather
+// than crashing the form.
 const FALLBACK_COORDS = { lat: 26.9124, lng: 75.7873 };
+
+// Default placeholder text in the address field — if GPS is unavailable and
+// the user never edits this, geocoding it would just resolve to the same
+// generic Jaipur-center point for everyone, recreating the original bug.
+const PLACEHOLDER_LOCATION = 'Jaipur, Rajasthan';
+
 async function geocodeAddress(address: string) {
   try {
     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`);
@@ -44,7 +51,7 @@ export default function ReportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [desc, setDesc] = useState('');
-  const [location, setLocation] = useState('Jaipur, Rajasthan');
+  const [location, setLocation] = useState(PLACEHOLDER_LOCATION);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AIResult | null>(null);
@@ -74,6 +81,13 @@ export default function ReportPage() {
     );
   }, []);
 
+  // True when GPS isn't available AND the user hasn't given a real address —
+  // submitting in this state would silently fall back to the generic
+  // Jaipur-center point again, so we block it and ask for a real address.
+  const needsRealAddress =
+    (locStatus === 'denied' || locStatus === 'unsupported') &&
+    location.trim().toLowerCase() === PLACEHOLDER_LOCATION.toLowerCase();
+
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const f = e.dataTransfer.files[0];
@@ -96,21 +110,27 @@ export default function ReportPage() {
 
   const handleSubmitForAnalysis = async () => {
     if (!file && !desc.trim()) return;
+
+    if (needsRealAddress) {
+      setError('We couldn\'t get your exact location. Please type the specific address above before submitting.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       let finalCoords = coords;
-if (locStatus !== 'found' && location.trim()) {
-  finalCoords = await geocodeAddress(location);
-}
+      if (locStatus !== 'found' && location.trim()) {
+        finalCoords = await geocodeAddress(location);
+      }
 
-const form = new FormData();
-if (file) form.append('media', file);
-if (desc) form.append('description', desc);
-form.append('city', 'Jaipur');
-form.append('address', location);
-form.append('lat', String(finalCoords.lat));
-form.append('lng', String(finalCoords.lng));
+      const form = new FormData();
+      if (file) form.append('media', file);
+      if (desc) form.append('description', desc);
+      form.append('city', 'Jaipur');
+      form.append('address', location);
+      form.append('lat', String(finalCoords.lat));
+      form.append('lng', String(finalCoords.lng));
 
       const { data } = await issueApi.create(form);
       if (data.duplicate) {
@@ -269,7 +289,9 @@ form.append('lng', String(finalCoords.lng));
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full border border-gray-200 rounded-civic pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-civic-teal focus:border-transparent"
+              className={`w-full border rounded-civic pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-civic-teal focus:border-transparent ${
+                needsRealAddress ? 'border-amber-300' : 'border-gray-200'
+              }`}
             />
           </div>
           <p className="text-xs mt-1.5 flex items-center gap-1">
@@ -285,7 +307,10 @@ form.append('lng', String(finalCoords.lng));
             )}
             {(locStatus === 'denied' || locStatus === 'unsupported') && (
               <span className="text-amber-600 flex items-center gap-1">
-                <AlertTriangle size={11} /> Couldn't get your exact location — using approximate Jaipur center. Edit the address above if needed.
+                <AlertTriangle size={11} />
+                {needsRealAddress
+                  ? "Couldn't get your exact location — please type the specific address above."
+                  : "Couldn't get your exact location — using the address you typed above."}
               </span>
             )}
           </p>
@@ -342,7 +367,7 @@ form.append('lng', String(finalCoords.lng));
         {!result && (
           <button
             onClick={handleSubmitForAnalysis}
-            disabled={loading || (!file && !desc.trim())}
+            disabled={loading || (!file && !desc.trim()) || needsRealAddress}
             className="btn-primary w-full justify-center py-3"
           >
             {loading ? (

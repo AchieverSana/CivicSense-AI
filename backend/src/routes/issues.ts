@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { authenticate, requireAuth } from '../middleware/auth';
+import { authenticate, requireAuth, requireAdmin } from '../middleware/auth';
 import {
   createIssue,
   getIssues,
   getIssueById,
   voteIssue,
   verifyIssue,
+  resolveIssue,
   getHeatmapData,
 } from '../controllers/issues.controller';
 import { generateIssueReport } from '../controllers/report.controller';
@@ -28,6 +29,8 @@ router.post('/', authenticate, upload.single('media'), createIssue);
 // requiring sign-in here is the right tradeoff, not just a bug workaround.
 router.post('/:id/vote', authenticate, requireAuth, voteIssue);
 router.post('/:id/verify', authenticate, requireAuth, verifyIssue);
+// Resolving is an authority action — only admins can close out an issue.
+router.post('/:id/resolve', authenticate, requireAuth, requireAdmin, resolveIssue);
 router.get('/:id/report', authenticate, generateIssueReport);
 
 export default router;
